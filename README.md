@@ -14,6 +14,22 @@ Edit Makefile
 Set CC=gcc/icc
 Set CFLAGS appropriately (-O3)
 
+
+
+To Contribute
+------------------------------
+Do following to update the project here on github in the master branch
+
+git add main.cpp
+git commit -m "comment on whatever you did"
+git push -u origin master
+
+
+Notes
+-------------------------------
+
 Edit main.cpp number of neurons, epoch length, etc.
 
 Changing K_MAX and the initial sample (V, Vs, Vp) produces interesting effects on learning rate
+
+Current test.txt is big (~1500 64-char lines)
