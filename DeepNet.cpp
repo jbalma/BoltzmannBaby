@@ -277,7 +277,7 @@ FeedForwardHidden(modelRBM,modelRBM.H,modelRBM.biasV);       //Determines p_mode
 modelRBM.Vs=targetVals;
 
 int k=0;
-float K_MAX=10;
+float K_MAX=3;
 
 	float norm=0;
 	float error = 0;
@@ -287,7 +287,7 @@ float K_MAX=10;
 	while(k<K_MAX)
 	{
 		///HiddenLayer Prob given inputs
-		FeedForwardVisible( modelRBM, modelRBM.Vs, modelRBM.biasH); 		//update sample of h_model from q_model
+		FeedForwardVisible( modelRBM, modelRBM.Vp, modelRBM.biasH); 		//update sample of h_model from q_model
 		
 		//UpdateBias(modelRBM,dataRBM);
 		WeightGradient(modelRBM,dataRBM);
@@ -317,8 +317,13 @@ float K_MAX=10;
 		++k;
 	}
 
+FeedForwardVisible( modelRBM, modelRBM.Vp, modelRBM.biasH); 
+WeightGradient(modelRBM,dataRBM);
+FeedForwardHidden( modelRBM, modelRBM.Hp, modelRBM.biasV);
+WeightGradient(modelRBM,dataRBM);
+
 	UpdateBias(modelRBM,dataRBM);
-	UpdateWeights(modelRBM,dataRBM,norm,K_MAX);
+	UpdateWeights(modelRBM,dataRBM,norm,(K_MAX+2));
 	cout << "Norm: " << norm << endl;
 	
 	//myRBM=modelRBM;
@@ -356,7 +361,7 @@ void DeepNet::FeedForwardVisible(RBM &myRBM, vector<float> inputVals, vector<flo
 	{
 		float sum=0;
 
-		#pragma omp simd reduction(+:sum)
+		//#pragma omp simd reduction(+:sum)
 		for(unsigned j=0; j<size_v; ++j)
 		{
 			sum += (inputVals[j])*myRBM.W[i][j];
@@ -406,7 +411,7 @@ void DeepNet::FeedForwardHidden(RBM &myRBM, vector<float> inputHiddens, vector<f
                 float sum=0;
 		float avg_hid_val=0;
 
-		#pragma omp simd reduction(+:sum)
+		//#pragma omp simd reduction(+:sum)
                 for(unsigned i=0; i<size_h; ++i)
                 {
                         sum += (inputHiddens[i])*myRBM.W[i][j];
@@ -459,7 +464,7 @@ void DeepNet::UpdateBias(RBM &myRBM, RBM dataRBM)
 
         //update visible bias
 	float num_vis=((float)size_v);
-        float q = 1.0/num_vis;
+        float q = 32.0/num_vis;
 	float avg_vbias_val=0;
 
 	#pragma omp parallel for
@@ -467,7 +472,7 @@ void DeepNet::UpdateBias(RBM &myRBM, RBM dataRBM)
 	{
 		float sum=0;
 		//#pragma omp parallel for reduction(+:sum)
-		#pragma omp simd reduction(+:sum)
+		//#pragma omp simd reduction(+:sum)
         	for(unsigned i=0; i<size_h; ++i)
         	{
                 	//sum += (myRBM.Hp[j]-dataHp[j])*myRBM.W[j].back();
@@ -500,7 +505,7 @@ void DeepNet::UpdateBias(RBM &myRBM, RBM dataRBM)
 	for(unsigned i=0; i<size_h; ++i)
 	{
 		float sum=0;
-		#pragma omp simd reduction(+:sum)
+		//#pragma omp simd reduction(+:sum)
         	for(unsigned j=0; j<size_v; ++j)
         	{
                 	//sum += (myRBM.Vp[j])*myRBM.W.back()[j];
@@ -573,7 +578,7 @@ void DeepNet::UpdateWeights(RBM &modelRBM, RBM dataRBM, float &L2, float K_MAX)
 		
                 for(unsigned j=0; j<num_v_neurons; ++j)
                 {
- 	                modelRBM.W.at(i).at(j) = modelRBM.W.at(i).at(j) + modelRBM.dW.at(i).at(j)/(K_MAX);// - 0.000001*L2;//
+ 	                modelRBM.W.at(i).at(j) = modelRBM.W.at(i).at(j) + RATE*modelRBM.dW.at(i).at(j)/(K_MAX);// - 0.000001*L2;//
 			//epsilon(<V[i]H[j]>_data - <V[i]H[j]>_model)
 
                         //normal += modelRBM.W.at(i).at(j);

@@ -41,6 +41,8 @@ public:
 
 	vector<RBM> Chain;
 
+	float RATE=2;
+
 	void InitRBM(RBM &myRBM, unsigned num_v_neurons, unsigned num_h_neurons);		//inits 2-layer neural net of given topology
 
 	void BuildChain(RBM myRBM);		 						//builds chain of RBMs with selected number of neurons in each layer

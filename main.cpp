@@ -129,15 +129,15 @@ int main()
 	DeepNet DRBM;
 
         unsigned f_bin_size = 96;
-        unsigned t_bin_size = 32;
-	unsigned num_samples = 10;
-	unsigned num_epochs = 500;
+        unsigned t_bin_size = 64;
+	unsigned num_samples = 4;
+	unsigned num_epochs = 1500;
 
 	unsigned num_RBM_in_chain = 1;
 	unsigned num_visible = f_bin_size*t_bin_size;
 	unsigned num_hidden = num_visible;
 	vector<int> nhidden(num_RBM_in_chain);
-	nhidden[0]=2048;
+	nhidden[0]=500;
 	//nhidden[1]=1000; //1536
 	//nhidden[2]=192;
 
@@ -214,7 +214,7 @@ float time=0;
 
 //for(unsigned s=0; s<num_epochs; ++s)
 int s=0;
-while(s<num_epochs)
+while(s<(num_epochs-num_samples))
 {
 
 for(unsigned i=0; i<DRBM.Chain.size(); ++i) ///layer of RBM chain
@@ -224,7 +224,7 @@ cout << "Training RBM: " << i << endl;
 
     for(unsigned t=s; t<(s+num_samples); ++t)///training loop of training_chunk_size number of samples for this "class"
     {
-	int t_r = s;//t + rand()%num_samples;
+	int t_r = t;//t + rand()%num_samples;
         std::vector<float> inputVals(num_visible), targetVals(num_visible);
 
 	Matrix visible(f_bin_size,vector<int>(t_bin_size));
@@ -242,7 +242,7 @@ cout << "Training RBM: " << i << endl;
 	sample_string = myBook.at(t_r) + myBook.at(t_r+1);
 	string sample;
 	sample.resize(t_bin_size);
-	int shift = rand()%t_bin_size;
+	int shift = rand()%(t_bin_size);
 	//cout << "sample_string: " << sample_string << endl;
 	int iter=0;
 	for(unsigned sh = shift; sh<shift+t_bin_size; ++sh)
@@ -328,7 +328,7 @@ cout << "Training RBM: " << i << endl;
 	}//end of sample loop t
 
 //s=s+num_samples;
-s++;
+//s++;
 
 	
 	//#pragma omp flush(DRBM)
@@ -409,7 +409,8 @@ s++;
 
 }//end of RBM layer loop
 
-cout << s << endl;
+cout << "Epoch " <<  s << "/"<< (num_epochs-1) << endl;
+s++;
 
 }//end of s loop
 
