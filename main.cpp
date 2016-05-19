@@ -129,17 +129,19 @@ int main()
 	DeepNet DRBM;
 
         unsigned f_bin_size = 96;
-        unsigned t_bin_size = 64;
+        unsigned t_bin_size = 32;
 	unsigned num_samples = 4;
-	unsigned num_epochs = 1500;
+	unsigned num_epochs = 600;
 
-	unsigned num_RBM_in_chain = 1;
+	unsigned num_RBM_in_chain = 8;
 	unsigned num_visible = f_bin_size*t_bin_size;
 	unsigned num_hidden = num_visible;
 	vector<int> nhidden(num_RBM_in_chain);
-	nhidden[0]=500;
-	//nhidden[1]=1000; //1536
-	//nhidden[2]=192;
+
+	for(unsigned n=0; n<num_RBM_in_chain; ++n)
+	{
+		nhidden[n]=256;
+	}
 
 	for(unsigned i=0; i<num_RBM_in_chain; ++i)
 	{	
@@ -151,6 +153,8 @@ int main()
 	DeepNet myTools;
 	string myphrase = "hello my name is";
 	Matrix charGrid(f_bin_size,vector<int>(t_bin_size));
+	Matrix tarGrid(f_bin_size,vector<int>(t_bin_size));
+
 	vector<string> myBook;
 	myTools.FillStringVector("test.txt", myBook,t_bin_size);
 
@@ -212,19 +216,29 @@ int main()
 
 float time=0;
 
+int INTERVAL=600;
+bool SUPERVISED=false;
+bool UNSUPERVISED=true;
+
 //for(unsigned s=0; s<num_epochs; ++s)
 int s=0;
 while(s<(num_epochs-num_samples))
 {
 
+DRBM.ERROR=0;
+
 for(unsigned i=0; i<DRBM.Chain.size(); ++i) ///layer of RBM chain
 {
 
-cout << "Training RBM: " << i << endl;
+//cout << "Training RBM: " << i << endl;
 
     for(unsigned t=s; t<(s+num_samples); ++t)///training loop of training_chunk_size number of samples for this "class"
     {
-	int t_r = t;//t + rand()%num_samples;
+
+	cout << "Epoch " <<  s << "/"<< (num_epochs-1) << endl;
+
+
+	int t_r = t + rand()%num_samples;
         std::vector<float> inputVals(num_visible), targetVals(num_visible);
 
 	Matrix visible(f_bin_size,vector<int>(t_bin_size));
@@ -237,25 +251,29 @@ cout << "Training RBM: " << i << endl;
 
 	//Bin2(f_inputVals, f_bin_size, t_bin_size, visible);
 	//Bin2(f_targetVals, f_bin_size, t_bin_size, target);
-	string sample_string;
+	string sample_string,target_string;
 	sample_string.resize(2*t_bin_size);
-	sample_string = myBook.at(t_r) + myBook.at(t_r+1);
-	string sample;
+	target_string.resize(2*t_bin_size);
+	sample_string = myBook.at(s) + myBook.at(s+1);
+	target_string = myBook.at(s) + myBook.at(s+1);
+	string sample, tarsample;
 	sample.resize(t_bin_size);
-	int shift = rand()%(t_bin_size);
+	tarsample.resize(t_bin_size);
+	int shift = t_r-s; 
 	//cout << "sample_string: " << sample_string << endl;
 	int iter=0;
 	for(unsigned sh = shift; sh<shift+t_bin_size; ++sh)
 	{
 		
 		sample[iter] = sample_string[sh];
+		tarsample[iter] = target_string[sh+t_bin_size];
 		iter = iter+1;
 	}
 
 	//cout << "shifted sample: " << sample << endl;
 
-	myTools.SetupInputs(sample,f_bin_size,t_bin_size,charGrid);  //map 128-char sample of text to charGrid
-
+	myTools.SetupInputs(sample,f_bin_size,t_bin_size,charGrid);  //map 128-char sample of text to charGrid for input
+	myTools.SetupInputs(tarsample,f_bin_size,t_bin_size,tarGrid);  //map 128-char sample of text to charGrid for target
 	//cout << "Raw Input for Layer: " << i << endl;
         //myTools.SampleToString(charGrid,f_bin_size,t_bin_size);             		   //Reconstruct a string from the charGrid
 
@@ -278,7 +296,8 @@ cout << "Training RBM: " << i << endl;
 			inputVals.at(track)=(charGrid.at(j).at(k));
 
 			//float targetProb = 1.0/(1.0+exp(-inputVals.at(track)));
-			//targetVals.at(track)=(targetProb);
+
+			targetVals.at(track)=(tarGrid.at(j).at(k));
 			track++;
 			
 		}
@@ -287,23 +306,89 @@ cout << "Training RBM: " << i << endl;
 	}	
 	
 
+	//DRBM.RATE = 2*exp(-0.001*(s*2));
+	DRBM.TIME = s;
+	DRBM.DEPTH = (i+1.0);
+	DRBM.ITERATION = (t-s);
+
+	if(s<INTERVAL){SUPERVISED=false; UNSUPERVISED=true;}
+	else if(s>=INTERVAL){SUPERVISED=true; UNSUPERVISED=false;}
+
+	if(UNSUPERVISED)
+	{
 		if(i==0)
 		{
-		//Calculate Gradient based on targetVals, update weights
-		DRBM.GradientDecent(DRBM.Chain.at(i),inputVals);
-		
-		}else if(i<DRBM.Chain.size() && i>0)
-		{
-                //Calculate Gradient based on targetVals, update weights
-                DRBM.GradientDecent(DRBM.Chain.at(i),DRBM.Chain.at(i-1).Vp);
-		}else
-		{
-                //Calculate Gradient based on targetVals, update weights
-                //DRBM.GradientDecent(DRBM.Chain.at(i),DRBM.Chain.at(i-1).Vp);
-		}
+			//Calculate Gradient based on targetVals, update weights
+			DRBM.StochasticGradientDecent(DRBM.Chain.at(i),inputVals,0);
 
-	        cout << "Input for Layer[" << i << "] on sample " << (t-s) << "/" << (num_samples-1) << endl;
-        	myTools.SampleToString(charGrid,f_bin_size,t_bin_size);                            //Reconstruct a string from the charGrid
+	                cout << "Input for Layer[" << i << "] on sample " << (t-s) << "/" << (num_samples-1) << endl;
+        	        myTools.SampleToString(charGrid,f_bin_size,t_bin_size);                            //Reconstruct a string from the charGrid
+
+		
+		}else if(i<(DRBM.Chain.size()-1) && i>0)
+		{
+                	//Get fresh visible sample based on DRBM.Chain.at(i-1).Vp
+			DRBM.GetVisibleSample(DRBM.Chain.at(i-1));
+                	//Calculate Gradient based on targetVals, update weights
+			DRBM.StochasticGradientDecent(DRBM.Chain.at(i),DRBM.Chain.at(i-1).Vs,0);
+
+	                cout << "Input for Layer[" << i << "] on sample " << (t-s) << "/" << (num_samples-1) << endl;
+        	        myTools.SampleToString(charGrid,f_bin_size,t_bin_size);                            //Reconstruct a string from the charGrid
+
+		}else
+                {
+
+			//Get fresh visible sample based on DRBM.Chain.at(i-1).Vp
+                        //DRBM.GetVisibleSample(DRBM.Chain.at(i-1));
+
+                        //Calculate Gradient based on last layers outputvals, and update weights
+                        DRBM.StochasticGradientDecent(DRBM.Chain.at(i),DRBM.Chain.at(i-1).Vp,1);
+                        //DRBM.Backprop(DRBM.Chain.at(i),DRBM.Chain.at(i-1).Vp,targetVals);
+
+                        cout << "Input for the Previous Layer[" << i << "] on sample " << (t-s) << "/" << (num_samples-1) << endl;
+                        myTools.SampleToString(charGrid,f_bin_size,t_bin_size);                            //Reconstruct a string from the charGrid
+
+                        cout << "Target Input for Final Layer[" << i << "] on sample " << (t-s) << "/" << (num_samples-1) << endl;
+                        myTools.SampleToString(tarGrid,f_bin_size,t_bin_size);                            //Reconstruct a string from the charGrid
+
+                }
+
+	}else if(SUPERVISED)
+	{
+
+	        if(i==0)
+                {
+                        //Calculate Gradient based on targetVals, update weights
+			DRBM.Backprop(DRBM.Chain.at(i),inputVals,targetVals);
+                        cout << "Input for Layer[" << i << "] on sample " << (t-s) << "/" << (num_samples-1) << endl;
+                        myTools.SampleToString(charGrid,f_bin_size,t_bin_size);                            //Reconstruct a string from the charGrid
+
+
+                }else if(i<(DRBM.Chain.size()-1) && i>0)
+                {
+                        //Calculate Gradient based on targetVals, update weights
+			DRBM.Backprop(DRBM.Chain.at(i),DRBM.Chain.at(i-1).Vs,targetVals);
+
+                        //cout << "Input for Layer[" << i << "] on sample " << (t-s) << "/" << (num_samples-1) << endl;
+                        //myTools.SampleToString(charGrid,f_bin_size,t_bin_size);                            //Reconstruct a string from the charGrid
+
+                }
+		else
+		{
+                	//Calculate Gradient based on targetVals, update weights
+			DRBM.Backprop(DRBM.Chain.at(i),DRBM.Chain.at(i-1).Vs,targetVals);
+
+			//DRBM.Chain.at(i-1)=DRBM.Chain.at(i);
+
+	                cout << "Previous Layer[" << i << "] on sample " << (t-s) << "/" << (num_samples-1) << endl;
+	                myTools.SampleToString(charGrid,f_bin_size,t_bin_size);                            //Reconstruct a string from the charGrid
+
+	                cout << "Target Input for Final Layer[" << i << "] on sample " << (t-s) << "/" << (num_samples-1) << endl;
+        	        myTools.SampleToString(tarGrid,f_bin_size,t_bin_size);                            //Reconstruct a string from the charGrid
+
+		}
+	}
+
 
                 unsigned tracker = 0;
 
@@ -319,8 +404,16 @@ cout << "Training RBM: " << i << endl;
                         }
                 }
 
-                cout << "Reconstruction:	" << endl;
-                myTools.SampleToString(charGrid,f_bin_size,t_bin_size);
+		if(i<DRBM.Chain.size()-1)
+		{
+                	cout << "Reconstruction:	" << endl;
+                	myTools.SampleToString(charGrid,f_bin_size,t_bin_size);
+		}else if(i==(DRBM.Chain.size()-1))
+		{
+		        cout << "Prediction:        " << endl;
+		        myTools.SampleToString(charGrid,f_bin_size,t_bin_size);
+
+		}
 
 
 
@@ -334,7 +427,7 @@ cout << "Training RBM: " << i << endl;
 	//#pragma omp flush(DRBM)
 		
 		ofstream activation_file("/tmp/activation.dat");
-		for(unsigned r=i; r<i+1; ++r)
+		for(unsigned r=i; r<DRBM.Chain.size(); ++r)
 		{
 			unsigned tracker = 0;
 
@@ -409,7 +502,7 @@ cout << "Training RBM: " << i << endl;
 
 }//end of RBM layer loop
 
-cout << "Epoch " <<  s << "/"<< (num_epochs-1) << endl;
+//cout << "Epoch " <<  s << "/"<< (num_epochs-1) << endl;
 s++;
 
 }//end of s loop

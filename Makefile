@@ -6,7 +6,7 @@ CXX=CC
 LD=CC
 
 
-CXX_FLAGS= -O2 -hstd=c++11 -hlist=am -static #-hflex_mp=intolerant#-hfp4 -haggress -hcache3 -hthread3 -hflex_mp=tolerant -hipa4 -hautothread #-hsystem_alloc -hnomemory_alloc_intrinsics -hdep_name -hlist=am
+CXX_FLAGS= -O2 -hstd=c++11 -hlist=am -static
 LD_FLAGS= -hstd=c++11 -homp
 
 INCLUDE= -I.#-D__USE_ACC

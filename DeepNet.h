@@ -13,6 +13,8 @@ struct RBM
 
 	vector< vector<float> > W;
 	vector< vector<float> > dW;
+	vector< vector<float> > dW_last;
+	
 
 	vector< float > V;	//Output Values of visible layer 	(v_data)
 	vector< float > H;	//Output Values of hidden layer  	(h_data)
@@ -41,7 +43,13 @@ public:
 
 	vector<RBM> Chain;
 
-	float RATE=2;
+	vector<vector<float>> ACCUM_GRAD;							//Matrix for summing all RBM's gradient contributions
+
+	float RATE;										//Learning rate
+	float TIME;										//Actual time (or individual sample #)
+	float ERROR;										//Accumulated error from each RBM as we go down the chai
+	float DEPTH;
+	float ITERATION;									//the sample number (which iteration of the batch we're on)
 
 	void InitRBM(RBM &myRBM, unsigned num_v_neurons, unsigned num_h_neurons);		//inits 2-layer neural net of given topology
 
@@ -51,17 +59,19 @@ public:
 	
 	void FeedForwardHidden(RBM &myRBM, vector<float> inputHiddens, vector<float> dataHp);	//set output values of visible layer given hidden
 
-	void GradientDecent(RBM &myRBM, vector<float> targetVals);				//Calculate Gradient based on targetVals, update weights
+	void StochasticGradientDecent(RBM &myRBM, vector<float> targetVals, bool OUTPUT_LAYER);	//Calculate Gradient based on targetVals, update weights
 
-	void UpdateBias(RBM &myRBM, RBM dataRBM);
+	void GetVisibleSample(RBM &myRBM);
 
-	void WeightGradient(RBM &modelRBM, RBM dataRBM);
+	void UpdateBias(RBM &myRBM, RBM dataRBM);						//Update visible and hidden bias neurons
+
+	void WeightGradient(RBM &modelRBM, RBM dataRBM, float &dwavg);				//Calculate a single RBM's contribution to the gradient
 
 	void getOutputs(RBM &myRMB);			 					//Update output and prob value arrays, set Vs and Hs sample arrays for next layer
 
-	void UpdateWeights(RBM &sampleRBM, RBM myRBM, float &norm, float K_MAX);	
+	void UpdateWeights(RBM &sampleRBM, RBM myRBM, float &norm, float K_MAX, bool OUTPUT_LAYER);	
 
-
+	void Backprop(RBM &modelRBM, vector<float> inputVals, vector<float> targetVals);
 
 	void SetupInputs(string f, unsigned num_f_bins, unsigned num_t_bins, Matrix &visible);
 
