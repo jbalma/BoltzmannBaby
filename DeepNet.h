@@ -10,6 +10,10 @@ struct RBM
 
 	unsigned avg_v;
 	unsigned avg_h;
+	
+	float error;
+	float s;
+	float f;
 
 	vector< vector<float> > W;
 	vector< vector<float> > dW;
@@ -25,8 +29,10 @@ struct RBM
         vector< float > Vs;	//Sample-based reconstruction of visible layer		(v_model)
         vector< float > Hs;	//Sample-based reconstruction of hidden layer		(h_model)
 
-	vector< float> biasV;
-	vector< float> biasH;	
+	vector< float > biasV;
+	vector< float > biasH;	
+
+	vector< float > res;	//Residuals of inputs vs targets
 
 	
 };
@@ -45,11 +51,17 @@ public:
 
 	vector<vector<float>> ACCUM_GRAD;							//Matrix for summing all RBM's gradient contributions
 
+	float NUM_SAMPLES;
+	float NUM_EPOCHS;
+	float F;
+	float S;
 	float RATE;										//Learning rate
 	float TIME;										//Actual time (or individual sample #)
 	float ERROR;										//Accumulated error from each RBM as we go down the chai
+	float TERROR;
 	float DEPTH;
 	float ITERATION;									//the sample number (which iteration of the batch we're on)
+	float BATCH;
 
 	void InitRBM(RBM &myRBM, unsigned num_v_neurons, unsigned num_h_neurons);		//inits 2-layer neural net of given topology
 
@@ -61,11 +73,23 @@ public:
 
 	void StochasticGradientDecent(RBM &myRBM, vector<float> targetVals, bool OUTPUT_LAYER);	//Calculate Gradient based on targetVals, update weights
 
+	void GetError(vector<float> outputVals, vector<float> targetVals, float &avg_error);
+
 	void GetVisibleSample(RBM &myRBM);
+
+	void GetHiddenSample(RBM &myRBM);
 
 	void UpdateBias(RBM &myRBM, RBM dataRBM);						//Update visible and hidden bias neurons
 
 	void WeightGradient(RBM &modelRBM, RBM dataRBM, float &dwavg);				//Calculate a single RBM's contribution to the gradient
+
+	void ResetGradient(RBM &modelRBM);
+	
+	void NormalizeWeights(RBM &modelRBM);
+
+	void NormalizeGradient(RBM &modelRBM);
+
+	void Stats(RBM &m);
 
 	void getOutputs(RBM &myRMB);			 					//Update output and prob value arrays, set Vs and Hs sample arrays for next layer
 
@@ -79,7 +103,7 @@ public:
 
 	void FillStringVector(string Filename, vector<string> &Book, int num_t_bins);
 
-
+	void NormalizeLayer(vector<float> &layer);
 	
 
 	

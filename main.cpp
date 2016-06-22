@@ -118,8 +118,6 @@ int main()
 {
 
 	srand (time(NULL));
-	float training_chunk_size=10.0;
-	float dt = 2*M_PI/10.0;
 
 	Gnuplot g0;
 	Gnuplot g1;
@@ -129,19 +127,46 @@ int main()
 	DeepNet DRBM;
 
         unsigned f_bin_size = 96;
-        unsigned t_bin_size = 32;
-	unsigned num_samples = 4;
-	unsigned num_epochs = 600;
+        unsigned t_bin_size = 64;
+	unsigned num_samples = 128;
+	unsigned num_iterations = 1600;
+	unsigned num_epochs = 320;
+	unsigned num_batches = num_iterations/num_epochs;
 
-	unsigned num_RBM_in_chain = 8;
+	unsigned num_RBM_in_chain = 4;
 	unsigned num_visible = f_bin_size*t_bin_size;
-	unsigned num_hidden = num_visible;
-	vector<int> nhidden(num_RBM_in_chain);
+	int num_hidden = 128;
 
-	for(unsigned n=0; n<num_RBM_in_chain; ++n)
+	DRBM.NUM_SAMPLES=num_samples;
+	DRBM.NUM_EPOCHS=num_epochs;
+
+
+
+	/// Create topology for network
+	/// Each element of nhidden
+	/// or nvisible describes the number of 
+	/// hidden and visible
+	//  neurons for each RBM[i]
+	
+	vector<int> nhidden(num_RBM_in_chain);
+	vector<int> nvisible(num_RBM_in_chain);
+
+	nhidden[0]=128;
+	nhidden[1]=126;
+	nhidden[2]=124;
+	nhidden[3]=120;
+
+	for(int i=0; i<num_RBM_in_chain; ++i)
 	{
-		nhidden[n]=256;
+		//nhidden[n-1]=num_hidden/(2*n);//128/(n+1);
+
+		cout << "num_hidden[" << i << "] :" << nhidden[i] << endl;
+		nvisible[i]=num_visible;
 	}
+
+	
+
+	/// Build RBM markov chain from 
 
 	for(unsigned i=0; i<num_RBM_in_chain; ++i)
 	{	
@@ -151,7 +176,6 @@ int main()
 	}
 
 	DeepNet myTools;
-	string myphrase = "hello my name is";
 	Matrix charGrid(f_bin_size,vector<int>(t_bin_size));
 	Matrix tarGrid(f_bin_size,vector<int>(t_bin_size));
 
@@ -161,10 +185,10 @@ int main()
 	for(unsigned page=0; page<myBook.size(); ++page)
 	{
 		myTools.SetupInputs(myBook.at(page),f_bin_size,t_bin_size,charGrid); 	//map 128-char sample of text to charGrid
-		myTools.SampleToString(charGrid,f_bin_size,t_bin_size);			//Reconstruct a string from the charGrid
+		//myTools.SampleToString(charGrid,f_bin_size,t_bin_size);			//Reconstruct a string from the charGrid
 	}
 
-	if(myBook.size()<num_samples*num_epochs)
+	if(myBook.size()<(num_batches*num_epochs))
 	{
 		cout << "Error: Not enough pages in book:" << myBook.size() << endl;
 		cout << "Required: " << num_samples*num_epochs << endl;
@@ -216,29 +240,43 @@ int main()
 
 float time=0;
 
-int INTERVAL=600;
+int INTERVAL=1;
 bool SUPERVISED=false;
 bool UNSUPERVISED=true;
 
 //for(unsigned s=0; s<num_epochs; ++s)
-int s=0;
-while(s<(num_epochs-num_samples))
-{
+//int s=0;
+//while(s<(num_epochs))
+//{
+
 
 DRBM.ERROR=0;
+DRBM.TERROR=0;
+
+int s=0;
+
+
+for(unsigned epoch=0; epoch<num_epochs; ++epoch)
+{
 
 for(unsigned i=0; i<DRBM.Chain.size(); ++i) ///layer of RBM chain
 {
 
-//cout << "Training RBM: " << i << endl;
+int b=0;
+s = num_batches*epoch;
 
-    for(unsigned t=s; t<(s+num_samples); ++t)///training loop of training_chunk_size number of samples for this "class"
+while(b<(num_batches))
+{
+    for(unsigned t=(s); t<(s+num_samples); ++t)///training loop over mini-batch samples 
     {
 
-	cout << "Epoch " <<  s << "/"<< (num_epochs-1) << endl;
+	cout << "Epoch		" << epoch << "/"<< (num_epochs-1) << endl;
+	cout << "Batch		" << b << "/" << (num_batches-1) << endl;
+	cout << "Mini-Batch	" << (t-s) << "/" << (num_samples-1) << endl;
+	cout << "Sample		" << s << "/" << (num_iterations) << endl;
 
 
-	int t_r = t + rand()%num_samples;
+	int t_r = t;//t + rand()%(num_samples);
         std::vector<float> inputVals(num_visible), targetVals(num_visible);
 
 	Matrix visible(f_bin_size,vector<int>(t_bin_size));
@@ -252,19 +290,18 @@ for(unsigned i=0; i<DRBM.Chain.size(); ++i) ///layer of RBM chain
 	//Bin2(f_inputVals, f_bin_size, t_bin_size, visible);
 	//Bin2(f_targetVals, f_bin_size, t_bin_size, target);
 	string sample_string,target_string;
-	sample_string.resize(2*t_bin_size);
-	target_string.resize(2*t_bin_size);
-	sample_string = myBook.at(s) + myBook.at(s+1);
-	target_string = myBook.at(s) + myBook.at(s+1);
+	sample_string.resize(4*t_bin_size);
+	target_string.resize(4*t_bin_size);
+	sample_string = myBook.at(s) + myBook.at(s+1) + myBook.at(s+2) + myBook.at(s+3);
+	target_string = myBook.at(s) + myBook.at(s+1) + myBook.at(s+2) + myBook.at(s+3);
 	string sample, tarsample;
 	sample.resize(t_bin_size);
 	tarsample.resize(t_bin_size);
-	int shift = t_r-s; 
+	int shift = t_r;
 	//cout << "sample_string: " << sample_string << endl;
 	int iter=0;
 	for(unsigned sh = shift; sh<shift+t_bin_size; ++sh)
-	{
-		
+	{	
 		sample[iter] = sample_string[sh];
 		tarsample[iter] = target_string[sh+t_bin_size];
 		iter = iter+1;
@@ -284,148 +321,215 @@ for(unsigned i=0; i<DRBM.Chain.size(); ++i) ///layer of RBM chain
 	{
 		for(unsigned k=0; k<t_bin_size; ++k)
 		{
-			
-			//cout << setiosflags(std::ios::fixed)
-          		//<< setprecision(0)
-          		//<< setw(1)
-          		//<< left
-          		//<< visible.at(j).at(k) << " ";
-			
-			//inputVals.at(track)=(visible.at(j).at(k));
-
 			inputVals.at(track)=(charGrid.at(j).at(k));
-
-			//float targetProb = 1.0/(1.0+exp(-inputVals.at(track)));
-
 			targetVals.at(track)=(tarGrid.at(j).at(k));
 			track++;
-			
 		}
-		
-		//cout << endl;
 	}	
 	
 
-	//DRBM.RATE = 2*exp(-0.001*(s*2));
-	DRBM.TIME = s;
-	DRBM.DEPTH = (i+1.0);
-	DRBM.ITERATION = (t-s);
+	DRBM.TIME++;			//the current sample
+	DRBM.DEPTH = (i+1);		//the current layer of the RBM chain
+	DRBM.ITERATION = (t-s)+1;	//a sample number starting at 0
+	DRBM.BATCH=b+1;
+	//if(s<INTERVAL){SUPERVISED=false; UNSUPERVISED=true;}
+	//else if(s>=INTERVAL){SUPERVISED=true; UNSUPERVISED=false;}
+	//if(TRAIN_TYPE==0){UNSUPERVISED=true;SUPERVISED=false;}
+	//if(TRAIN_TYPE==1){SUPERVISED=true;UNSUPERVISED=false;}
 
-	if(s<INTERVAL){SUPERVISED=false; UNSUPERVISED=true;}
-	else if(s>=INTERVAL){SUPERVISED=true; UNSUPERVISED=false;}
+	SUPERVISED=false;
+	UNSUPERVISED=true;
 
 	if(UNSUPERVISED)
 	{
-		if(i==0)
-		{
-			//Calculate Gradient based on targetVals, update weights
-			DRBM.StochasticGradientDecent(DRBM.Chain.at(i),inputVals,0);
 
-	                cout << "Input for Layer[" << i << "] on sample " << (t-s) << "/" << (num_samples-1) << endl;
-        	        myTools.SampleToString(charGrid,f_bin_size,t_bin_size);                            //Reconstruct a string from the charGrid
-
-		
-		}else if(i<(DRBM.Chain.size()-1) && i>0)
+		if(i>0)
 		{
-                	//Get fresh visible sample based on DRBM.Chain.at(i-1).Vp
-			DRBM.GetVisibleSample(DRBM.Chain.at(i-1));
-                	//Calculate Gradient based on targetVals, update weights
+			//DRBM.NormalizeLayer(DRBM.Chain.at(i-1));		
+			DRBM.FeedForwardVisible(DRBM.Chain.at(0), inputVals, DRBM.Chain.at(0).biasH);
+			//DRBM.StochasticGradientDecent(DRBM.Chain.at(0),inputVals,0);
+
+			for(unsigned k=1; k<i; ++k)
+			{
+				DRBM.GetHiddenSample(DRBM.Chain.at(k-1));
+				DRBM.FeedForwardHidden(DRBM.Chain.at(k), DRBM.Chain.at(k-1).Hs, DRBM.Chain.at(k).biasH);
+				DRBM.GetVisibleSample(DRBM.Chain.at(k-1));
+				DRBM.FeedForwardVisible(DRBM.Chain.at(k), DRBM.Chain.at(k-1).Vs, DRBM.Chain.at(k).biasV);
+				//DRBM.StochasticGradientDecent(DRBM.Chain.at(k),DRBM.Chain.at(k-1).Vs,0);
+			}
+			//DRBM.NormalizeLayer(DRBM.Chain.at(i-1).Vs);
 			DRBM.StochasticGradientDecent(DRBM.Chain.at(i),DRBM.Chain.at(i-1).Vs,0);
 
-	                cout << "Input for Layer[" << i << "] on sample " << (t-s) << "/" << (num_samples-1) << endl;
-        	        myTools.SampleToString(charGrid,f_bin_size,t_bin_size);                            //Reconstruct a string from the charGrid
+		}else
+		{
+			 DRBM.StochasticGradientDecent(DRBM.Chain.at(0),inputVals,0);
+		}
+
+
+                        cout << "SGD: Input for Layer[" << i << "] on sample " << (t-s) << "/" << (num_samples-1) << endl;
+                        myTools.SampleToString(charGrid,f_bin_size,t_bin_size);                            //Reconstruct a string from the charGrid
+
+
+	}
+
+	if(SUPERVISED)
+	{
+		//Place holder for backprop
+		if(i>0)
+		{
+			DRBM.FeedForwardVisible(DRBM.Chain.at(0), inputVals, DRBM.Chain.at(0).biasH);
+
+                        for(unsigned k=1; k<i; ++k)
+                        {
+                                DRBM.GetVisibleSample(DRBM.Chain.at(k-1));
+				DRBM.FeedForwardVisible(DRBM.Chain.at(k), DRBM.Chain.at(k-1).Vs, DRBM.Chain.at(k).biasH);
+                                //DRBM.StochasticGradientDecent(DRBM.Chain.at(k),DRBM.Chain.at(k-1).Vs,0);
+                        }
+
+			//DRBM.NormalizeLayer(DRBM.Chain.at(i-1).Vs);
+			DRBM.Backprop(DRBM.Chain.at(i), DRBM.Chain.at(i-1).Vs, targetVals);
 
 		}else
-                {
-
-			//Get fresh visible sample based on DRBM.Chain.at(i-1).Vp
-                        //DRBM.GetVisibleSample(DRBM.Chain.at(i-1));
-
-                        //Calculate Gradient based on last layers outputvals, and update weights
-                        DRBM.StochasticGradientDecent(DRBM.Chain.at(i),DRBM.Chain.at(i-1).Vp,1);
-                        //DRBM.Backprop(DRBM.Chain.at(i),DRBM.Chain.at(i-1).Vp,targetVals);
-
-                        cout << "Input for the Previous Layer[" << i << "] on sample " << (t-s) << "/" << (num_samples-1) << endl;
-                        myTools.SampleToString(charGrid,f_bin_size,t_bin_size);                            //Reconstruct a string from the charGrid
-
-                        cout << "Target Input for Final Layer[" << i << "] on sample " << (t-s) << "/" << (num_samples-1) << endl;
-                        myTools.SampleToString(tarGrid,f_bin_size,t_bin_size);                            //Reconstruct a string from the charGrid
-
-                }
-
-	}else if(SUPERVISED)
-	{
-
-	        if(i==0)
-                {
-                        //Calculate Gradient based on targetVals, update weights
-			DRBM.Backprop(DRBM.Chain.at(i),inputVals,targetVals);
-                        cout << "Input for Layer[" << i << "] on sample " << (t-s) << "/" << (num_samples-1) << endl;
-                        myTools.SampleToString(charGrid,f_bin_size,t_bin_size);                            //Reconstruct a string from the charGrid
-
-
-                }else if(i<(DRBM.Chain.size()-1) && i>0)
-                {
-                        //Calculate Gradient based on targetVals, update weights
-			DRBM.Backprop(DRBM.Chain.at(i),DRBM.Chain.at(i-1).Vs,targetVals);
-
-                        //cout << "Input for Layer[" << i << "] on sample " << (t-s) << "/" << (num_samples-1) << endl;
-                        //myTools.SampleToString(charGrid,f_bin_size,t_bin_size);                            //Reconstruct a string from the charGrid
-
-                }
-		else
 		{
-                	//Calculate Gradient based on targetVals, update weights
-			DRBM.Backprop(DRBM.Chain.at(i),DRBM.Chain.at(i-1).Vs,targetVals);
-
-			//DRBM.Chain.at(i-1)=DRBM.Chain.at(i);
-
-	                cout << "Previous Layer[" << i << "] on sample " << (t-s) << "/" << (num_samples-1) << endl;
-	                myTools.SampleToString(charGrid,f_bin_size,t_bin_size);                            //Reconstruct a string from the charGrid
-
-	                cout << "Target Input for Final Layer[" << i << "] on sample " << (t-s) << "/" << (num_samples-1) << endl;
-        	        myTools.SampleToString(tarGrid,f_bin_size,t_bin_size);                            //Reconstruct a string from the charGrid
-
+			DRBM.Backprop(DRBM.Chain.at(0), inputVals, targetVals);
 		}
+
+			
+                        //cout << "BackProp: Input for Layer[" << i << "] on sample " << (t-s) << "/" << (num_samples-1) << endl;
+                        //myTools.SampleToString(charGrid,f_bin_size,t_bin_size);
+                        cout << "BackProp: Target for Layer[" << i << "] on sample " << (t-s) << "/" << (num_samples-1) << endl;
+                        myTools.SampleToString(tarGrid,f_bin_size,t_bin_size);
 	}
 
 
+	
+
                 unsigned tracker = 0;
 
+		//DRBM.GetVisibleSample(DRBM.Chain.at(i));
 
                 for(unsigned j=0; j<f_bin_size; ++j)
                 {
                         for(unsigned k=0; k<t_bin_size; ++k)
                         {
-                                //DRBM.getOutputs(DRBM.Chain.at(i));
-
                                 charGrid.at(j).at(k) = DRBM.Chain.at(i).Vs.at(tracker);
                                 tracker++;
                         }
                 }
 
-		if(i<DRBM.Chain.size()-1)
-		{
-                	cout << "Reconstruction:	" << endl;
-                	myTools.SampleToString(charGrid,f_bin_size,t_bin_size);
-		}else if(i==(DRBM.Chain.size()-1))
-		{
-		        cout << "Prediction:        " << endl;
-		        myTools.SampleToString(charGrid,f_bin_size,t_bin_size);
 
+               	cout << "Reconstruction:	" << endl;
+               	myTools.SampleToString(charGrid,f_bin_size,t_bin_size);
+
+		
+		DRBM.Stats(DRBM.Chain.at(i));
+
+		if((DRBM.ITERATION)==(num_samples))
+		{
+			if(b==(num_batches-1))
+			{
+				//DRBM.ResetGradient(DRBM.Chain.at(i));
+				//DRBM.NormalizeWeights(DRBM.Chain.at(i));
+				//DRBM.NormalizeGradient(DRBM.Chain.at(i));
+			}
+			//DRBM.NormalizeLayer(DRBM.Chain.at(i));
+			//DRBM.NormalizeWeights(DRBM.Chain.at(i)); 
 		}
-
-
 
 
 	}//end of sample loop t
 
-//s=s+num_samples;
-//s++;
+        //Last iteration of the sample, but before reset of gradient, lets test the current network on an unknown sample
+
+	std::vector<float> inputVals(num_visible), targetVals(num_visible);
+
+        string sample_string,target_string;
+        sample_string.resize(4*t_bin_size);
+        target_string.resize(4*t_bin_size);
+        sample_string = myBook.at(s) + myBook.at(s+1) + myBook.at(s+2) + myBook.at(s+3);
+        target_string = myBook.at(s) + myBook.at(s+1) + myBook.at(s+2) + myBook.at(s+3);
+        string sample, tarsample;
+        sample.resize(t_bin_size);
+        tarsample.resize(t_bin_size);
+        //cout << "sample_string: " << sample_string << endl;
+        int iter=0;
+        for(unsigned sh = 0; sh<t_bin_size; ++sh)
+        {
+
+                sample[iter] = sample_string[sh]; //test inputval
+                tarsample[iter] = target_string[sh+t_bin_size];	//inputval
+                iter = iter+1;
+        }
+
+        //cout << "shifted sample: " << sample << endl;
+
+        myTools.SetupInputs(sample,f_bin_size,t_bin_size,charGrid);  //map 128-char sample of text to charGrid for input
+        myTools.SetupInputs(tarsample,f_bin_size,t_bin_size,tarGrid);  //map 128-char sample of text to charGrid for target
 
 	
-	//#pragma omp flush(DRBM)
-		
+        unsigned track=0;
+
+        for(unsigned j=0; j<f_bin_size; ++j)
+        {
+                for(unsigned k=0; k<t_bin_size; ++k)
+                {
+                        inputVals.at(track)=(charGrid.at(j).at(k));
+                        targetVals.at(track)=(tarGrid.at(j).at(k));
+                        track++;
+                }
+        }
+
+	
+/*
+	cout << "/////////////////////////////////////////////////" << endl;
+        cout << "///	Training Sample Input   : " << endl;
+	cout << "///	";
+	myTools.SampleToString(charGrid,f_bin_size,t_bin_size);
+
+	
+                unsigned tracker = 0;
+                for(unsigned j=0; j<f_bin_size; ++j)
+                {
+                        for(unsigned k=0; k<t_bin_size; ++k)
+                        {
+                                //DRBM.getOutputs(DRBM.Chain.at(i));
+				
+			        //FeedForwardVisible(RBM &myRBM, vector<float> inputVals, vector<float> biasH)
+        			DRBM.FeedForwardVisible(DRBM.Chain.at(0), inputVals, DRBM.Chain.at(0).biasH);
+
+        			for(unsigned k=0; k<(DRBM.Chain.size()); ++k)
+        			{
+                			DRBM.GetVisibleSample(DRBM.Chain.at(k));
+        			}
+
+
+                                charGrid.at(j).at(k) = DRBM.Chain.back().Vs.at(tracker);
+                                tracker++;
+                        }
+                }
+
+
+
+	cout << "///	Training Sample Output	: " << endl;
+	cout << "///	";
+	myTools.SampleToString(charGrid,f_bin_size,t_bin_size);
+	cout << "/////////////////////////////////////////////////" << endl;
+	cout << endl;
+	cout << endl;
+*/	
+
+//	DRBM.ResetGradient(DRBM.Chain.back());
+
+
+///---------------------------------Plot Generation-------------------------------------------///
+
+
+
+
+
+///---------------------------------Plot Generation-------------------------------------------///
+
+			
 		ofstream activation_file("/tmp/activation.dat");
 		for(unsigned r=i; r<DRBM.Chain.size(); ++r)
 		{
@@ -436,7 +540,6 @@ for(unsigned i=0; i<DRBM.Chain.size(); ++i) ///layer of RBM chain
 			{
 			for(unsigned k=0; k<t_bin_size; ++k)
 			{
-				DRBM.getOutputs(DRBM.Chain.at(r));				
                         		activation_file << DRBM.Chain.at(r).Vs.at(tracker) << ", ";
 				
 				charGrid.at(j).at(k) = DRBM.Chain.at(r).Vs.at(tracker);
@@ -499,55 +602,20 @@ for(unsigned i=0; i<DRBM.Chain.size(); ++i) ///layer of RBM chain
         g1.cmd(mplotcmd);
         g1.cmd("reread");
 
+///---------------------------------End Plot Generation----------------------------------------///
+
+//s++;
+b++;
+s++;
+}//end of sample s loop
+
 
 }//end of RBM layer loop
 
-//cout << "Epoch " <<  s << "/"<< (num_epochs-1) << endl;
-s++;
+//s++;
 
-}//end of s loop
+}//end of epoch (full update of all weights in network)
 
-/*
-///RBM sample loop
-std::vector<float> p = resultVals;
-std::default_random_engine gen;
-std::discrete_distribution<unsigned> dis {p.at(0),p.at(1),p.at(2),p.at(3),p.at(4),p.at(5),p.at(6),p.at(7),p.at(8),p.at(9)};
-
-
-ofstream function_file("/tmp/function.dat");
-for(unsigned j=0; j<10; ++j)
-{
-	function_file << j*dt << ", " <<  f_targetVals.at(j) << ", " << ", " << f_inputVals.at(j) << endl;
-}
-function_file.close();
-function_file.flush();
-*/
-
-
-/*
-ofstream sample_file("sample.dat");
-for(unsigned j=0; j<sample_resultVals.size(); ++j)
-{
-	for(unsigned k=0; k<t_bin_size; ++k)
-	{
-        	sample_file << resultVals.at(j) << ", " << j << endl;
-	}
-}
-sample_file.close();
-sample_file.flush();
-*/
-
-
-//g1.set_grid();
-//g1.cmd("set palette");
-//g1.cmd("set pm3d map");
-//g1.cmd("set view map");
-//g1.cmd("splot '/tmp/function.dat' using 1:2:1 with lines lc rgb 'blue' title 'f_target',\
-		'/tmp/function.dat' using 1:3:1 with lines lc rgb 'green' title 'raw output rbm',\
-		'/tmp/function.dat' using 1:4:1 with lines lc rgb 'red' title 'f_input',\
-		'/tmp/sample.dat' using 1:2:3 with pounsigneds lc palette title 'sample inv_RBM output'");
-
-//g1.cmd("plot '/tmp/sample.dat' matrix with image");
 
 	
 return 0;
